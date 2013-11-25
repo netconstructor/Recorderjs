@@ -1,110 +1,102 @@
 (function (root, factory) {
-    if (typeof define === 'function' && define.amd) {
-        // AMD. Register as an anonymous module.
-        define(["recorderWorker"], factory);
+    if (typeof define === "function" && define.amd) {
+        define(["recorderWorker"], factory)
     } else {
-        // Browser globals
-        root.Recorder = factory(root.recorderWorker);
+        root.Recorder = factory(root.recorderWorker)
     }
-}(this, function (recorderWorker) {
-    //use b in some fashion.
-
-    // Just return a value to define the module export.
-    // This example returns an object, but the module
-    // can return a function as the exported value.
-  //var WORKER_PATH = 'recorderWorker.js';
+}(this, function (recorderWorker){
 
   var Recorder = function(source, cfg){
-    var config = cfg || {};
-    var bufferLen = config.bufferLen || 4096;
-    var numChannels = config.numChannels || 2;
-    this.context = source.context;
-    this.node = this.context.createJavaScriptNode(bufferLen, numChannels, numChannels);
-    //var worker = new Worker(config.workerPath || WORKER_PATH);
+    var config = cfg || {}
+    var bufferLen = config.bufferLen || 4096
+    var numChannels = config.numChannels || 2
+    this.context = source.context
+    this.node = this.context.createJavaScriptNode(bufferLen, numChannels, numChannels)
+
+    //var worker = new Worker(config.workerPath || WORKER_PATH)
 
     // Fill a blob with the code we want the worker to execute
-    var blob = new Blob(['(' + recorderWorker.toString() + ')();'], {type: "text/javascript"});
-
-    // Obtain a URL to our worker 'file'
-    var workerBlobURL = window.URL.createObjectURL(blob);
-
-    var worker = new Worker(workerBlobURL);
+    var blob = new Blob(["(" + recorderWorker.toString() + ")()"],
+                        { type: "text/javascript" })
+      , workerBlobURL = window.URL.createObjectURL(blob)
+      , worker = new Worker(workerBlobURL)
 
     worker.postMessage({
-      command: 'init',
+      command: "init",
       config: {
         sampleRate: this.context.sampleRate,
         numChannels: numChannels
       }
-    });
+    })
+
     var recording = false,
-      currCallback;
+      currCallback
 
     this.node.onaudioprocess = function(e){
       if (!recording) return;
-      var buffer = [];
-      for (var channel = 0; channel < numChannels; channel++){
-          buffer.push(e.inputBuffer.getChannelData(channel));
+      var buffer = []
+      for (var channel = 0; channel < numChannels; channel++) {
+        buffer.push(e.inputBuffer.getChannelData(channel))
       }
       worker.postMessage({
-        command: 'record',
+        command: "record",
         buffer: buffer
-      });
+      })
     }
 
     this.configure = function(cfg){
-      for (var prop in cfg){
-        if (cfg.hasOwnProperty(prop)){
-          config[prop] = cfg[prop];
+      for (var prop in cfg) {
+        if (cfg.hasOwnProperty(prop)) {
+          config[prop] = cfg[prop]
         }
       }
     }
 
     this.record = function(){
-      recording = true;
+      recording = true
     }
 
     this.stop = function(){
-      recording = false;
+      recording = false
     }
 
     this.clear = function(){
-      worker.postMessage({ command: 'clear' });
+      worker.postMessage({ command: "clear" })
     }
 
     this.getBuffer = function(cb){
-      currCallback = cb || config.callback;
-      worker.postMessage({ command: 'getBuffer' })
+      currCallback = cb || config.callback
+      worker.postMessage({ command: "getBuffer" })
     }
 
     this.exportWAV = function(cb, type){
-      currCallback = cb || config.callback;
-      type = type || config.type || 'audio/wav';
-      if (!currCallback) throw new Error('Callback not set');
+      currCallback = cb || config.callback
+      type = type || config.type || "audio/wav"
+      if (!currCallback) throw new Error("Callback not set")
       worker.postMessage({
-        command: 'exportWAV',
+        command: "exportWAV",
         type: type
-      });
+      })
     }
 
     worker.onmessage = function(e){
-      var blob = e.data;
-      currCallback(blob);
+      var blob = e.data
+      currCallback(blob)
     }
 
-    source.connect(this.node);
-    this.node.connect(this.context.destination);    //this should not be necessary
-  };
+    source.connect(this.node)
+    this.node.connect(this.context.destination) //this should not be necessary
+  }
 
   Recorder.forceDownload = function(blob, filename){
-    var url = (window.URL || window.webkitURL).createObjectURL(blob);
-    var link = window.document.createElement('a');
-    link.href = url;
-    link.download = filename || 'output.wav';
-    var click = document.createEvent("Event");
-    click.initEvent("click", true, true);
-    link.dispatchEvent(click);
+    var url = (window.URL || window.webkitURL).createObjectURL(blob)
+    var link = window.document.createElement("a")
+    link.href = url
+    link.download = filename || "output.wav"
+    var click = document.createEvent("Event")
+    click.initEvent("click", true, true)
+    link.dispatchEvent(click)
   }
 
   return Recorder
-}));
+}))
